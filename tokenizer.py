@@ -18,6 +18,11 @@ class Token:
     def __str__(self):
         return str((self.ttype, self.value))
 
+    def __eq__(self, string):
+        return self.value == string
+
+    def __ne__(self, string):
+        return self.value != string
 
 class Tokenizer:
     """Takes an inputstring and provides an API to access the
@@ -37,6 +42,17 @@ class Tokenizer:
     STRINGLITERAL = r'\"([^\n]*)\"'
     IDENTIFIER = r'([A-Za-z_]\w*)'
     TOKEN = f'{KEYWORD}|{SYMBOL}|{INTLITERAL}|{STRINGLITERAL}|{IDENTIFIER}'
+    @staticmethod
+    def getxml(token):
+        """Get a token enclosed by its type in an xml tag."""
+        xmlmap = {
+            Tokenizer.TTKEYWORD: "<keyword> {} </keyword>",
+            Tokenizer.TTSYMBOL: "<symbol> {} </symbol>",
+            Tokenizer.TTNUM: "<integerConstant> {} </integerConstant>",
+            Tokenizer.TTSTRING: "<stringConstant> {} </stringConstant>",
+            Tokenizer.TTID: "<identifier> {} </identifier>"
+        }
+        return xmlmap[token.ttype].format(token.value)
 
     def __init__(self, instring):
         self._tokens = self._tokenize(instring)
@@ -46,23 +62,53 @@ class Tokenizer:
         return len(self._tokens) == 0
 
     def getnext(self):
-        """Get the next token from the string and pops it from the list."""
+        """Get the next token and remove it from the stream."""
         return self._tokens.pop(0)
+
+    def peeknext(self):
+        """Get the next token and without removing it from the stream."""
+        if self._tokens:
+            return self._tokens[-1]
+        raise IndexError("peek from empty list")
+
+    def getnextoftype(self, ttype):
+        """Get the next token if it matches 'type' and remove it from the stream.
+        If next token doesn't match type, then raise Exception."""
+        typechecker = {
+            self.TTKEYWORD: self.nextiskeyword,
+            self.TTSYMBOL: self.nextissymbol,
+            self.TTNUM: self.nextisconstant,
+            self.TTSTRING: self.nextisconstant,
+            self.TTID: self.nextisid
+        }
+        if typechecker[ttype]():
+            return self.getnext()
+        raise Exception(f"Next token not of type {ttype}.")
+
+    ####### Type Checkers #######
+    def nextissymbol(self):
+        """Returns true if there is a next token and if it is a symbol."""
+        return self._tokens and self._tokens[-1].ttype == self.TTSYMBOL
+
+    def nextisconstant(self):
+        """Returns true if there is a next token and if it is a num or string."""
+        return self._tokens and self._tokens[-1].ttype in [self.TTSTRING, self.TTNUM]
+
+    def nextisid(self):
+        """Returns true if there is a next token and if it is a id."""
+        return self._tokens and self._tokens[-1].ttype == self.TTID
+
+    def nextiskeyword(self):
+        """Returns true if there is a next token and if it is a keyword."""
+        return self._tokens and self._tokens[-1].ttype == self.TTSYMBOL
 
     @property
     def xml(self):
         """Get the tokens as an multiline-string
         that encloses each token by its type in an xml tag."""
-        xmlmap = {
-            self.TTKEYWORD: "<keyword> {} </keyword>",
-            self.TTSYMBOL: "<symbol> {} </symbol>",
-            self.TTNUM: "<integerConstant> {} </integerConstant>",
-            self.TTSTRING: "<stringConstant> {} </stringConstant>",
-            self.TTID: "<identifier> {} </identifier>"
-        }
-        tokens = os.linesep.join(
-            [xmlmap[t.ttype].format(t.value) for t in self._tokens])
+        tokens = os.linesep.join([self.getxml(t) for t in self._tokens])
         return f"<tokens>\n{tokens}\n</tokens>\n"
+
 
     def _tokenize(self, string):
         string = self._removecomments(string)
