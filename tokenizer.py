@@ -18,6 +18,9 @@ class Token:
     def __str__(self):
         return str((self.ttype, self.value))
 
+    def __repr__(self):
+        return f"Token({self.ttype}, '{self.value}')"
+
     def __eq__(self, string):
         return self.value == string
 
@@ -59,16 +62,16 @@ class Tokenizer:
 
     def hasnext(self):
         """Returns true if there is a next token."""
-        return len(self._tokens) == 0
+        return bool(self._tokens)
 
     def getnext(self):
         """Get the next token and remove it from the stream."""
         return self._tokens.pop(0)
 
-    def peeknext(self):
+    def peeknext(self, index=0):
         """Get the next token and without removing it from the stream."""
         if self._tokens:
-            return self._tokens[-1]
+            return self._tokens[index]
         raise IndexError("peek from empty list")
 
     def getnextoftype(self, ttype):
@@ -88,19 +91,19 @@ class Tokenizer:
     ####### Type Checkers #######
     def nextissymbol(self):
         """Returns true if there is a next token and if it is a symbol."""
-        return self._tokens and self._tokens[-1].ttype == self.TTSYMBOL
+        return self._tokens and self._tokens[0].ttype == self.TTSYMBOL
 
     def nextisconstant(self):
         """Returns true if there is a next token and if it is a num or string."""
-        return self._tokens and self._tokens[-1].ttype in [self.TTSTRING, self.TTNUM]
+        return self._tokens and self._tokens[0].ttype in [self.TTSTRING, self.TTNUM]
 
     def nextisid(self):
         """Returns true if there is a next token and if it is a id."""
-        return self._tokens and self._tokens[-1].ttype == self.TTID
+        return self._tokens and self._tokens[0].ttype == self.TTID
 
     def nextiskeyword(self):
         """Returns true if there is a next token and if it is a keyword."""
-        return self._tokens and self._tokens[-1].ttype == self.TTSYMBOL
+        return self._tokens and self._tokens[0].ttype == self.TTKEYWORD
 
     @property
     def xml(self):

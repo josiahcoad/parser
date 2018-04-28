@@ -1,30 +1,36 @@
 """Create a parse tree in xml.
     TODO: Make SYMBOL type the actual symbol
 """
+import os
 from tokenizer import Tokenizer
-
 
 class Parser:
     """Create a parse tree in xml."""
-    INDENTAMOUNT = 4
+    INDENTAMOUNT = 2
 
     def __init__(self, string):
         self._tstream = Tokenizer(string)
         self._xml = []
         self._curindent = 0
+        self._class()
+
+    @property
+    def xml(self):
+        """Get the parse tree xml as a formatted string."""
+        return os.linesep.join(self._xml)
 
     ###### Parser Methods ######
     def _class(self):
         # 'class' <className> '{' <classVarDec>* <subroutineDec>* '}'
         self._addopentag('class')
-        self._tstream.addnext(Tokenizer.KEYWORD)  # class
-        self._tstream.addnext(Tokenizer.ID)       # <classname>
-        self._tstream.addnext(Tokenizer.SYMBOL)   # {
+        self._addnext(Tokenizer.TTKEYWORD)  # class
+        self._addnext(Tokenizer.TTID)       # <classname>
+        self._addnext(Tokenizer.TTSYMBOL)   # {
         while self._isclassvardec(self._tstream.peeknext()):
             self._vardec()
         while self._ismethodec(self._tstream.peeknext()):
             self._subroutinedec()
-        self._tstream.addnext(Tokenizer.SYMBOL)  # }
+        self._addnext(Tokenizer.TTSYMBOL)  # }
         self._addclosetag('class')
 
     def _subroutinedec(self):
@@ -32,12 +38,13 @@ class Parser:
         #   ('void' | <type>) <subroutineName> '(' <parameterList> ')'
         #   <subroutineBody>
         self._addopentag('subroutineDec')
-        self._tstream.addnext(Tokenizer.KEYWORD)
-        self._tstream.addnext(Tokenizer.KEYWORD)
-        self._tstream.addnext(Tokenizer.ID)
-        self._tstream.addnext(Tokenizer.SYMBOL)
-        # parameterList
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTKEYWORD)
+        self._addnext(Tokenizer.TTKEYWORD)
+        self._addnext(Tokenizer.TTID)
+        self._addnext(Tokenizer.TTSYMBOL)
+        self._parameterlist()
+        self._addnext(Tokenizer.TTSYMBOL)
+        self._subroutinebody()
         self._addclosetag('subroutineDec')
 
     def _vardec(self):
@@ -54,37 +61,44 @@ class Parser:
 
     def _commonvardec(self):
         # only meant to be called by _classvardec or _vardec!
-        self._tstream.addnext(Tokenizer.KEYWORD)
-        self._tstream.addnext(Tokenizer.ID)  # type
-        self._tstream.addnext(Tokenizer.ID)  # varName
-        while (self._tstream.peeknext() == ','):
-            self._tstream.addnext(Tokenizer.SYMBOL)  # ,
-            self._tstream.addnext(Tokenizer.ID)      # varName
-        self._tstream.addnext(Tokenizer.SYMBOL)  # ;
+        self._addnext(Tokenizer.TTKEYWORD)
+        # type as a user defined type
+        if self._tstream.peeknext().ttype == Tokenizer.TTID:
+            self._addnext(Tokenizer.TTID)
+        # type as a primitive type
+        else:
+            self._addnext(Tokenizer.TTKEYWORD)
+        self._addnext(Tokenizer.TTID)  # varName
+        while self._tstream.peeknext() == ',':
+            self._addnext(Tokenizer.TTSYMBOL)  # ,
+            self._addnext(Tokenizer.TTID)      # varName
+        self._addnext(Tokenizer.TTSYMBOL)  # ;
 
     def _parameterlist(self):
         # (<type> <varName> (',' <type> <varName>)* )?
         self._addopentag('parameterList')
-        self._tstream.addnext(Tokenizer.SYMBOL)  # (
         if self._tstream.peeknext() != ')':
-            self._tstream.addnext(Tokenizer.ID)     # type
-            self._tstream.addnext(Tokenizer.ID)     # varName
-            while (self._tstream.peeknext() == ','):
-                self._tstream.addnext(Tokenizer.SYMBOL)  # ,
-                self._tstream.addnext(Tokenizer.ID)      # type
-                self._tstream.addnext(Tokenizer.ID)      # varName
-        self._tstream.addnext(Tokenizer.SYMBOL)          # )
+            # type as a user defined type
+            if self._tstream.peeknext().ttype == Tokenizer.TTID:
+                self._addnext(Tokenizer.TTID)
+            # type as a primitive type
+            else:
+                self._addnext(Tokenizer.TTKEYWORD)
+            self._addnext(Tokenizer.TTID)     # varName
+            while self._tstream.peeknext() == ',':
+                self._addnext(Tokenizer.TTSYMBOL)  # ,
+                self._addnext(Tokenizer.TTID)      # type
+                self._addnext(Tokenizer.TTID)      # varName
         self._addclosetag('parameterList')
 
     def _subroutinebody(self):
         # '{' <varDec>* <statements> '}'
         self._addopentag('subroutineBody')
-        self._tstream.addnext(Tokenizer.SYMBOL)  # {
+        self._addnext(Tokenizer.TTSYMBOL)  # {
         while self._tstream.peeknext() == 'var':
             self._vardec()
-        while self._isstatement(self._tstream.peeknext()):
-            self._statement()
-        self._tstream.addnext(Tokenizer.SYMBOL)  # }
+        self._statements()
+        self._addnext(Tokenizer.TTSYMBOL)  # }
         self._addclosetag('subroutineBody')
 
     #~~~~~~ Statement Parser Methods ~~~~~~#
@@ -93,76 +107,91 @@ class Parser:
         # <doStatement> | <returnStatement>
         methods = {
             'let': self._letstatement,
-            'if': self._letstatement,
-            'while': self._letstatement,
-            'do': self._letstatement,
+            'if': self._ifstatement,
+            'while': self._whilestatement,
+            'do': self._dostatement,
             'return': self._returnstatement,
         }
-        methods[self._tstream.peeknext()]()
+        methods[self._tstream.peeknext().value]()
 
     def _letstatement(self):
         # 'let' <varName> ('[' <expression> ']')? '=' <expression> ';'
         self._addopentag("letStatement")
-        self._tstream.addnext(Tokenizer.KEYWORD)
-        self._tstream.addnext(Tokenizer.ID)
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTKEYWORD)
+        self._addnext(Tokenizer.TTID)
         if self._tstream.peeknext() == '[':
-            self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTSYMBOL)
             self._expression()
-            self._tstream.addnext(Tokenizer.SYMBOL)
-        self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTSYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
         self._expression()
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
         self._addclosetag("letStatement")
 
     def _ifstatement(self):
+        # 'if' '(' <expression> ')' '{' statements> '}'
+        # ('else' '{' statements> '}')?
         self._addopentag("ifStatement")
-        # add
+        self._addnext(Tokenizer.TTKEYWORD)
+        self._addnext(Tokenizer.TTSYMBOL)
+        self._expression()
+        self._addnext(Tokenizer.TTSYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
+        self._statements()
+        self._addnext(Tokenizer.TTSYMBOL)
+        if self._tstream.peeknext() == 'else':
+            self._addnext(Tokenizer.TTKEYWORD)
+            self._addnext(Tokenizer.TTSYMBOL)
+            self._statements()
+            self._addnext(Tokenizer.TTSYMBOL)
         self._addclosetag("ifStatement")
 
     def _whilestatement(self):
-        # 'while' '(' <expression> ')' '{' statements> '}' ('else' '{' statements> '}')?
+        # 'while' '(' <expression> ')' '{' <statements> '}' ('else' '{' statements> '}')?
         self._addopentag("whileStatement")
-        self._tstream.addnext(Tokenizer.KEYWORD)
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTKEYWORD)
+        self._addnext(Tokenizer.TTSYMBOL)
         self._expression()
-        self._tstream.addnext(Tokenizer.SYMBOL)
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
         self._statements()
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
         if self._tstream.peeknext() == 'else':
-            self._tstream.addnext(Tokenizer.KEYWORD)
-            self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTKEYWORD)
+            self._addnext(Tokenizer.TTSYMBOL)
             self._statements()
-            self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTSYMBOL)
         self._addclosetag("whileStatement")
 
     def _dostatement(self):
         # 'do' <subroutineCall> ';'
-        self._tstream.addnext(Tokenizer.KEYWORD)
+        self._addopentag("doStatement")
+        self._addnext(Tokenizer.TTKEYWORD)
         self._subroutinecall()
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
+        self._addclosetag("doStatement")
 
     def _returnstatement(self):
         # 'return' <expression>? ';
         self._addopentag("returnStatement")
-        self._tstream.addnext(Tokenizer.KEYWORD)
+        self._addnext(Tokenizer.TTKEYWORD)
         if self._tstream.peeknext() != ';':
             self._expression()
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
         self._addclosetag("returnStatement")
 
     def _statements(self):
         # <statement>*
         self._addopentag("statements")
-        while self._tstream.peeknext() != '{':
+        while self._isstatement(self._tstream.peeknext()):
             self._statement()
         self._addclosetag("statements")
 
     def _expressionlist(self):
         # (<expression> (',' <expression>)* )?
         self._addopentag("expressionList")
-        self._expression()
+        if self._tstream.peeknext() != ')':
+            self._expression()
         while self._tstream.peeknext() == ',':
             self._expression()
         self._addclosetag("expressionList")
@@ -170,8 +199,9 @@ class Parser:
     def _expression(self):
         # <term> (<op> <term>)*
         self._addopentag("expression")
+        self._term()
         while self._isbinaryop(self._tstream.peeknext()):
-            self._addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTSYMBOL)
             self._term()
         self._addclosetag("expression")
 
@@ -181,45 +211,48 @@ class Parser:
         #   | '(' <expression> ')' | unaryOp <term>
         self._addopentag("term")
         # integerConstant
-        if self._tstream.peeknext().ttype == Tokenizer.INTLITERAL:
-            self._tstream.addnext(Tokenizer.INTLITERAL)
+        if self._tstream.peeknext().ttype == Tokenizer.TTNUM:
+            self._addnext(Tokenizer.TTNUM)
         # stringConstant
-        elif self._tstream.peeknext().ttype == Tokenizer.STRINGLITERAL:
-            self._tstream.addnext(Tokenizer.STRINGLITERAL)
+        elif self._tstream.peeknext().ttype == Tokenizer.TTSTRING:
+            self._addnext(Tokenizer.TTSTRING)
         # keywordConstant
         elif self._iskeywordconstant(self._tstream.peeknext()):
-            self._tstream.addnext(Tokenizer.KEYWORD)
-        # <varName> | <varName> '[' <expression> ']'
-        elif self._tstream.peeknext().ttype == Tokenizer.IDENTIFIER:
-            self._tstream.addnext(Tokenizer.IDENTIFIER)
-            if self._tstream.peeknext() == '[':
-                self._tstream.addnext(Tokenizer.SYMBOL)
-                self._expression()
-                self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTKEYWORD)
+        # <varName> | <varName> '[' <expression> ']' | <subroutineCall>
+        elif self._tstream.peeknext().ttype == Tokenizer.TTID:
+            # <subroutineCall>
+            if self._tstream.peeknext(1) in ['(', '.']:
+                self._subroutinecall()
+            # <varName> | <varName> '[' <expression> ']'
+            else:
+                self._addnext(Tokenizer.TTID)
+                # '[' <expression> ']'
+                if self._tstream.peeknext() == '[':
+                    self._addnext(Tokenizer.TTSYMBOL)
+                    self._expression()
+                    self._addnext(Tokenizer.TTSYMBOL)
         # '(' <expression> ')'
         elif self._tstream.peeknext() == '(':
-            self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTSYMBOL)
             self._expression()
-            self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTSYMBOL)
         # unaryOp <term>
         elif self._isunaryop(self._tstream.peeknext()):
-            self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTSYMBOL)
             self._term()
-        # <subroutineCall>
-        else:
-            self._subroutinecall()
         self._addclosetag("term")
 
     def _subroutinecall(self):
         # <subroutineName> '(' <expressionList> ')' |
         # (<className>|<varName>) '.' <subroutineName> '(' <expressionList> ')'
-        self._tstream.addnext(Tokenizer.IDENTIFIER)
+        self._addnext(Tokenizer.TTID)
         if self._tstream.peeknext() == '.':
-            self._tstream.addnext(Tokenizer.SYMBOL)
-            self._tstream.addnext(Tokenizer.IDENTIFIER)
-        self._tstream.addnext(Tokenizer.SYMBOL)
+            self._addnext(Tokenizer.TTSYMBOL)
+            self._addnext(Tokenizer.TTID)
+        self._addnext(Tokenizer.TTSYMBOL)
         self._expressionlist()
-        self._tstream.addnext(Tokenizer.SYMBOL)
+        self._addnext(Tokenizer.TTSYMBOL)
 
     ###### Type Checkers ######
     def _isclassvardec(self, token):
@@ -235,7 +268,7 @@ class Parser:
         return token in ['-', '~']
 
     def _isbinaryop(self, token):
-        return token in ['+', '-', '*', '/', '&', ',', '<', '>', '=']
+        return token in ['+', '-', '*', '/', '&', ',', '<', '>', '=', '|']
 
     def _iskeywordconstant(self, token):
         return token in ['true', 'false', 'null', 'this']
@@ -246,13 +279,16 @@ class Parser:
         self._addleveltoken(self._tstream.getnextoftype(ttype))
 
     def _addleveltoken(self, token):
-        self._xml.append(self._tstream.getxml(token))
+        # only to be called by _addnext
+        self._xml.append(self._getindent() + self._tstream.getxml(token))
 
-    def _addopentag(self, token):
-        pass
+    def _addopentag(self, tag):
+        self._xml.append(self._getindent() + "<" + tag + ">")
+        self._incindent()
 
-    def _addclosetag(self, token):
-        pass
+    def _addclosetag(self, tag):
+        self._decindent()
+        self._xml.append(self._getindent() + "</" + tag + ">")
 
     def _incindent(self):
         self._curindent += 1
