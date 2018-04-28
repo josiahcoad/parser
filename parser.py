@@ -17,7 +17,7 @@ class Parser:
     @property
     def xml(self):
         """Get the parse tree xml as a formatted string."""
-        return os.linesep.join(self._xml)
+        return os.linesep.join(self._xml) + os.linesep
 
     ###### Parser Methods ######
     def _class(self):
@@ -27,7 +27,7 @@ class Parser:
         self._addnext(Tokenizer.TTID)       # <classname>
         self._addnext(Tokenizer.TTSYMBOL)   # {
         while self._isclassvardec(self._tstream.peeknext()):
-            self._vardec()
+            self._classvardec()
         while self._ismethodec(self._tstream.peeknext()):
             self._subroutinedec()
         self._addnext(Tokenizer.TTSYMBOL)  # }

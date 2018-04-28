@@ -55,7 +55,13 @@ class Tokenizer:
             Tokenizer.TTSTRING: "<stringConstant> {} </stringConstant>",
             Tokenizer.TTID: "<identifier> {} </identifier>"
         }
-        return xmlmap[token.ttype].format(token.value)
+        encodings = {
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot',
+            '&': '&amp;',
+        }
+        return xmlmap[token.ttype].format(encodings.get(token.value, token.value))
 
     def __init__(self, instring):
         self._tokens = self._tokenize(instring)
