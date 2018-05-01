@@ -4,6 +4,7 @@
 import os
 from tokenizer import Tokenizer
 
+
 class Parser:
     """Create a parse tree in xml."""
     INDENTAMOUNT = 2
@@ -39,7 +40,12 @@ class Parser:
         #   <subroutineBody>
         self._addopentag('subroutineDec')
         self._addnext(Tokenizer.TTKEYWORD)
-        self._addnext(Tokenizer.TTKEYWORD)
+        # type as a user defined type
+        if self._tstream.peeknext().ttype == Tokenizer.TTID:
+            self._addnext(Tokenizer.TTID)
+        # type as a primitive type
+        else:
+            self._addnext(Tokenizer.TTKEYWORD)
         self._addnext(Tokenizer.TTID)
         self._addnext(Tokenizer.TTSYMBOL)
         self._parameterlist()
@@ -73,7 +79,7 @@ class Parser:
             self._addnext(Tokenizer.TTSYMBOL)  # ,
             self._addnext(Tokenizer.TTID)      # varName
         self._addnext(Tokenizer.TTSYMBOL)  # ;
-
+    @wrap("parameterList")
     def _parameterlist(self):
         # (<type> <varName> (',' <type> <varName>)* )?
         self._addopentag('parameterList')
@@ -87,7 +93,12 @@ class Parser:
             self._addnext(Tokenizer.TTID)     # varName
             while self._tstream.peeknext() == ',':
                 self._addnext(Tokenizer.TTSYMBOL)  # ,
-                self._addnext(Tokenizer.TTID)      # type
+                # type as a user defined type
+                if self._tstream.peeknext().ttype == Tokenizer.TTID:
+                    self._addnext(Tokenizer.TTID)
+                # type as a primitive type
+                else:
+                    self._addnext(Tokenizer.TTKEYWORD)
                 self._addnext(Tokenizer.TTID)      # varName
         self._addclosetag('parameterList')
 
@@ -193,6 +204,7 @@ class Parser:
         if self._tstream.peeknext() != ')':
             self._expression()
         while self._tstream.peeknext() == ',':
+            self._addnext(Tokenizer.TTSYMBOL)
             self._expression()
         self._addclosetag("expressionList")
 
@@ -255,6 +267,7 @@ class Parser:
         self._addnext(Tokenizer.TTSYMBOL)
 
     ###### Type Checkers ######
+
     def _isclassvardec(self, token):
         return token in ['field', 'static']
 
@@ -268,7 +281,7 @@ class Parser:
         return token in ['-', '~']
 
     def _isbinaryop(self, token):
-        return token in ['+', '-', '*', '/', '&', ',', '<', '>', '=', '|']
+        return token in ['+', '-', '*', '/', '&', '<', '>', '=', '|']
 
     def _iskeywordconstant(self, token):
         return token in ['true', 'false', 'null', 'this']
@@ -298,33 +311,3 @@ class Parser:
 
     def _getindent(self):
         return ' ' * self.INDENTAMOUNT * self._curindent
-
-    # def tagwrap(tag):
-    #     def decorated(f):
-    #         def wrapper(*args, **kwargs):
-    #             self._addopentag(tag)
-    #             f(*args, **kwargs)
-    #             self._addclosetag(tag)
-    #         return wrapper
-    #     return decorated
-
-
-# class A:
-#     def _addopentag(self, tag):
-#         print("_addopentag " + tag)
-
-#     def _addclosetag(self, tag):
-#         print("_addclosetag " + tag)
-
-#     def tagwrap(self, tag):
-#         def decorated(f):
-#             def wrapper(*args, **kwargs):
-#                 self._addopentag(tag)
-#                 f(*args, **kwargs)
-#                 self._addclosetag(tag)
-#             return wrapper
-#         return decorated
-
-#     @tagwrap("cool")
-#     def printme():
-#         print("me")

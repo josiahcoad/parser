@@ -34,6 +34,7 @@ def readwrite(basename):
 def main():
     """Main program to run."""
     readwrite(getfilename_from_terminal())
+    # readwrite("../Project_8_codes/Square/Square")
 
 
 if __name__ == "__main__":

@@ -27,6 +27,7 @@ class Token:
     def __ne__(self, string):
         return self.value != string
 
+
 class Tokenizer:
     """Takes an inputstring and provides an API to access the
     tokens of the string in order they are in the string.
@@ -45,23 +46,6 @@ class Tokenizer:
     STRINGLITERAL = r'\"([^\n]*)\"'
     IDENTIFIER = r'([A-Za-z_]\w*)'
     TOKEN = f'{KEYWORD}|{SYMBOL}|{INTLITERAL}|{STRINGLITERAL}|{IDENTIFIER}'
-    @staticmethod
-    def getxml(token):
-        """Get a token enclosed by its type in an xml tag."""
-        xmlmap = {
-            Tokenizer.TTKEYWORD: "<keyword> {} </keyword>",
-            Tokenizer.TTSYMBOL: "<symbol> {} </symbol>",
-            Tokenizer.TTNUM: "<integerConstant> {} </integerConstant>",
-            Tokenizer.TTSTRING: "<stringConstant> {} </stringConstant>",
-            Tokenizer.TTID: "<identifier> {} </identifier>"
-        }
-        encodings = {
-            '<': '&lt;',
-            '>': '&gt;',
-            '"': '&quot',
-            '&': '&amp;',
-        }
-        return xmlmap[token.ttype].format(encodings.get(token.value, token.value))
 
     def __init__(self, instring):
         self._tokens = self._tokenize(instring)
@@ -118,6 +102,23 @@ class Tokenizer:
         tokens = os.linesep.join([self.getxml(t) for t in self._tokens])
         return f"<tokens>\n{tokens}\n</tokens>\n"
 
+    @staticmethod
+    def getxml(token):
+        """Get a single token enclosed by its type in an xml tag."""
+        xmlmap = {
+            Tokenizer.TTKEYWORD: "<keyword> {} </keyword>",
+            Tokenizer.TTSYMBOL: "<symbol> {} </symbol>",
+            Tokenizer.TTNUM: "<integerConstant> {} </integerConstant>",
+            Tokenizer.TTSTRING: "<stringConstant> {} </stringConstant>",
+            Tokenizer.TTID: "<identifier> {} </identifier>"
+        }
+        encodings = {
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot',
+            '&': '&amp;',
+        }
+        return xmlmap[token.ttype].format(encodings.get(token.value, token.value))
 
     def _tokenize(self, string):
         string = self._removecomments(string)
@@ -128,8 +129,8 @@ class Tokenizer:
         return [Token(ttype, match) for ttype, match in zip(ttypes, tokens)]
 
     def _removecomments(self, string):
-        string = re.sub(r'//.*', '', string)
-        return re.sub(r'/\*.*?\*/', '', string, flags=re.S)
+        string = re.sub(r'//.*', '\n', string)
+        return re.sub(r'/\*.*?\*/', '\n', string, flags=re.S)
 
     def __str__(self):
         return str([str(t) for t in self._tokens])
