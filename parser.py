@@ -79,7 +79,7 @@ class Parser:
             self._addnext(Tokenizer.TTSYMBOL)  # ,
             self._addnext(Tokenizer.TTID)      # varName
         self._addnext(Tokenizer.TTSYMBOL)  # ;
-    @wrap("parameterList")
+
     def _parameterlist(self):
         # (<type> <varName> (',' <type> <varName>)* )?
         self._addopentag('parameterList')
